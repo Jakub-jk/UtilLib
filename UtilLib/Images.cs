@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Drawing.Drawing2D;
@@ -12,6 +13,67 @@ namespace UtilLib
 {
     public class Images
     {
+        public static Bitmap ChangeColour(Bitmap bmp, byte inColourR, byte inColourG, byte inColourB, byte outColourR, byte outColourG, byte outColourB)
+        {
+            // Specify a pixel format.
+            PixelFormat pxf = PixelFormat.Format24bppRgb;
+
+            // Lock the bitmap's bits.
+            Rectangle rect = new Rectangle(0, 0, bmp.Width, bmp.Height);
+            BitmapData bmpData =
+            bmp.LockBits(rect, ImageLockMode.ReadWrite,
+                         pxf);
+
+            // Get the address of the first line.
+            IntPtr ptr = bmpData.Scan0;
+
+            // Declare an array to hold the bytes of the bitmap. 
+            // int numBytes = bmp.Width * bmp.Height * 3; 
+            int numBytes = bmpData.Stride * bmp.Height;
+            byte[] rgbValues = new byte[numBytes];
+
+            // Copy the RGB values into the array.
+            Marshal.Copy(ptr, rgbValues, 0, numBytes);
+
+            // Manipulate the bitmap
+            for (int counter = 0; counter < rgbValues.Length; counter += 3)
+            {
+                if (rgbValues[counter] == inColourR &&
+                    rgbValues[counter + 1] == inColourG &&
+                    rgbValues[counter + 2] == inColourB)
+
+                {
+                    rgbValues[counter] = outColourR;
+                    rgbValues[counter + 1] = outColourG;
+                    rgbValues[counter + 2] = outColourB;
+                }
+            }
+
+            // Copy the RGB values back to the bitmap
+            Marshal.Copy(rgbValues, 0, ptr, numBytes);
+
+            // Unlock the bits.
+            bmp.UnlockBits(bmpData);
+
+            return bmp;
+        }
+
+        public static Bitmap ToGrayScale(Bitmap bmp)
+        {
+            int x, y;
+            Bitmap tmp = bmp;
+            for (x = 0; x < tmp.Width; x++)
+            {
+                for (y = 0; y < tmp.Height; y++)
+                {
+                    Color c = tmp.GetPixel(x, y);
+                    Color nc = Color.FromArgb(c.R, 0, 0);
+                    tmp.SetPixel(x, y, nc);
+                }
+            }
+            return tmp;
+        }
+
         public static Bitmap ResizeImage(Image image, int width, int height)
         {
             var destRect = new Rectangle(0, 0, width, height);
@@ -222,5 +284,43 @@ namespace UtilLib
         {
             return ImageCodecInfo.GetImageDecoders().SingleOrDefault(c => c.FormatID == format.Guid);
         }
+
+        /// <summary>
+        /// Creates a new Image containing the same image only rotated
+        /// </summary>
+        /// <param name=""image"">The <see cref=""System.Drawing.Image"/"> to rotate
+        /// <param name=""offset"">The position to rotate from.
+        /// <param name=""angle"">The amount to rotate the image, clockwise, in degrees
+        /// <returns>A new <see cref=""System.Drawing.Bitmap"/"> of the same size rotated.</see>
+        /// <exception cref=""System.ArgumentNullException"">Thrown if <see cref=""image"/"> 
+        /// is null.</see>
+        public static Bitmap RotateImage(Image image, PointF offset, float angle)
+        {
+            if (image == null)
+                throw new ArgumentNullException("image");
+
+            //create a new empty bitmap to hold rotated image
+            Bitmap rotatedBmp = new Bitmap(image.Width, image.Height);
+            rotatedBmp.SetResolution(image.HorizontalResolution, image.VerticalResolution);
+
+            //make a graphics object from the empty bitmap
+            Graphics g = Graphics.FromImage(rotatedBmp);
+
+            //Put the rotation point in the center of the image
+            g.TranslateTransform(offset.X, offset.Y);
+
+            //rotate the image
+            g.RotateTransform(angle);
+
+            //move the image back
+            g.TranslateTransform(-offset.X, -offset.Y);
+
+            //draw passed in image onto graphics object
+            g.DrawImage(image, new PointF(0, 0));
+
+            return rotatedBmp;
+        }
+
+
     }
 }
